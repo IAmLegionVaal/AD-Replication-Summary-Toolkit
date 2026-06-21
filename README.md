@@ -1,33 +1,63 @@
 # AD Replication Summary Toolkit
 
-PowerShell tools for Active Directory replication reporting and guarded replication recovery actions.
+PowerShell tooling for Active Directory replication reporting and guarded recovery actions.
 
-## Report
+## Scripts
+
+- `AD_Replication_Summary_Toolkit.ps1` — read-only replication reporting.
+- `AD_Replication_Repair_Toolkit.ps1` — targeted replication, DNS registration, and domain-controller service recovery.
+
+## Requirements
+
+- Windows with `repadmin.exe` and `dcdiag.exe` from AD DS or RSAT tools.
+- Appropriate Active Directory and remote-management permissions.
+- PowerShell remoting for repairs against a remote domain controller.
+
+Local DNS or service repair requires an elevated PowerShell session. Remote repairs are authorized by the remote credentials and WinRM configuration.
+
+## Examples
+
+Preview a replication synchronization:
 
 ```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\AD_Replication_Summary_Toolkit.ps1
+powershell.exe -ExecutionPolicy Bypass -File .\AD_Replication_Repair_Toolkit.ps1 `
+  -DomainController DC01 -SyncAll -DryRun
 ```
 
-## Repair
+Run selected recovery actions:
 
 ```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\AD_Replication_Repair_Toolkit.ps1 -DomainController DC01 -SyncAll -DryRun
+powershell.exe -ExecutionPolicy Bypass -File .\AD_Replication_Repair_Toolkit.ps1 `
+  -DomainController DC01 -SyncAll -RegisterDns -RestartNetlogon -Yes
 ```
 
-Examples:
+Available actions are `-SyncAll`, `-RegisterDns`, `-RestartNetlogon`, and `-RestartKdc`. Omit `-Yes` to require typing `YES`.
 
-```powershell
-.\AD_Replication_Repair_Toolkit.ps1 -DomainController DC01 -SyncAll
-.\AD_Replication_Repair_Toolkit.ps1 -DomainController DC01 -RegisterDns
-.\AD_Replication_Repair_Toolkit.ps1 -DomainController DC01 -RestartNetlogon
-.\AD_Replication_Repair_Toolkit.ps1 -DomainController DC01 -RestartKdc
-```
+## Evidence and verification
 
-The repair script captures `repadmin` and `dcdiag` evidence before and after repair, supports local or authorised remote service actions, and includes `-DryRun`, confirmation, logging and clear exit codes.
+Each run writes `before.json`, `after.json`, and `repair.log` to a timestamped directory under `%ProgramData%\ADReplicationRepair` unless `-OutputPath` is supplied. `syncall.txt` is added when replication synchronization is requested.
+
+The before-state file is the pre-repair evidence backup. Verification checks the post-action `repadmin /replsummary` result, DNS resolution after registration, and requested service states. `-DryRun` records intended actions without applying or verifying them.
+
+## Exit codes
+
+| Code | Meaning |
+|---:|---|
+| 0 | Completed successfully, including a successful dry run |
+| 2 | Invalid arguments |
+| 3 | Unsupported platform or missing AD support tools |
+| 4 | Elevation required for local service repair |
+| 10 | User cancelled |
+| 20 | One or more repair actions failed |
+| 30 | Post-repair verification failed |
 
 ## Safety
 
-Replication and domain-controller service changes can affect the wider domain. Use targeted actions after confirming DNS, time synchronisation and current replication state.
+Replication and domain-controller service actions can affect the wider domain. Confirm DNS, time synchronization, and replication topology before use, and prefer a maintenance window for service restarts.
+
+## Validation status
+
+The scripts were source-reviewed during this update. They were not runtime-tested in an Active Directory domain.
 
 ## Author
 
